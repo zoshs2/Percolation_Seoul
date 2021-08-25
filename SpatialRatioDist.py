@@ -2,15 +2,17 @@ from datetime import datetime
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+import pandas as pd
  
-def SpatialRatioDist(loc_df:pd.DataFrame, ratio_df:pd.DataFrame, c_map=plt.cm.jet_r) -> plt.show():
+def SpatialRatioDist(LinkLocationDF:pd.DataFrame, time_dataset:pd.DataFrame, c_map=plt.cm.jet_r, truncate=False, minval=0.2, maxval=0.8, savefig:'file_name'=False) -> plt.show():
     ''' Display the Spatial Distribution of Link Qualities on the geometric locations of Seoul Roads.
     Parameters
     ---------
-    loc_df : pd.DataFrame
+    LinkLocationDF : pd.DataFrame
         DataFrame which contains "Geometric Location" for each Seoul Links. (Longitute & Latitude)
 
-    ratio_df : pd.DataFrame
+    time_dataset : pd.DataFrame
         DataFrame which contains "Link Quality" for each Seoul Links.
 
     c_map : plt.cm.<colormap>
@@ -30,7 +32,7 @@ def SpatialRatioDist(loc_df:pd.DataFrame, ratio_df:pd.DataFrame, c_map=plt.cm.je
     ** Some Pre-processing before plotting **
 
     In order to plot the Spatial Ratio Distribution of the links based on their REAL location(lon, lat), we 
-    should compare their included informations with each other (i.e., loc_df and ratio_df). 
+    should compare their included informations with each other (i.e., LinkLocationDF and time_dataset). 
     Up to 'Second Stage', it is the process that organizes matching link(s), not non-matching link(s).
     '''
     # We can only use a certain part of the colormap by this function.
@@ -54,9 +56,9 @@ def SpatialRatioDist(loc_df:pd.DataFrame, ratio_df:pd.DataFrame, c_map=plt.cm.je
         return new_cmap
 
     # First Stage: Find non-matching link(s)
-    slink_id = loc_df['link_id'].unique()
+    slink_id = LinkLocationDF['link_id'].unique()
     noexist_id = []
-    for vel_id in ratio_df['LINK_ID'].values:
+    for vel_id in time_dataset['LINK_ID'].values:
         if vel_id in slink_id:
             continue
 
@@ -68,27 +70,28 @@ def SpatialRatioDist(loc_df:pd.DataFrame, ratio_df:pd.DataFrame, c_map=plt.cm.je
             print("Non-matching Link: ", noexist_id)
 
     # Second Stage: Organize matching link(s) only. 
-    dropIdx = ratio_df[ratio_df['LINK_ID'].isin(nonexist_id)].index
-    ratio_df = ratio_df.drop(dropIdx).reset_index(drop=True)
+    dropIdx = time_dataset[time_dataset['LINK_ID'].isin(nonexist_id)].index
+    time_dataset = time_dataset.drop(dropIdx).reset_index(drop=True)
     # In addition, we decompose the dataset into that of link(s) not-having NaN Ratio.
-    nanIdx = ratio_df[ratio_df['ratio'].isna()].index
+    nanIdx = time_dataset[time_dataset['ratio'].isna()].index
     if not nanIdx.empty:
-        nanLink = ratio_df.loc[nanIdx, 'LINK_ID'].values
+        nanLink = time_dataset.loc[nanIdx, 'LINK_ID'].values
         print("NaN Ratio Link: ", nanLink)
-        ratio_df = ratio_df.drop(nanIdx).reset_index(drop=True)
+        time_dataset = time_dataset.drop(nanIdx).reset_index(drop=True)
 
     else:
         print("Nothing link(s) with NaN ratio")
 
     # Third Stage: Plot the ratio spatial distribution with colormap
-    ratio_df = ratio_df.sort_values('ratio').reset_index(drop=True)
+    time_dataset = time_dataset.sort_values('ratio').reset_index(drop=True)
 
-    TIME = ratio_df.loc[0, ['PRCS_YEAR','PRCS_MON','PRCS_DAY','PRCS_HH', 'PRCS_MIN']].astype(np.int64).values
+    TIME = time_dataset.loc[0, ['PRCS_YEAR','PRCS_MON','PRCS_DAY','PRCS_HH', 'PRCS_MIN']].astype(np.int64).values
     TIME = datetime(TIME[0], TIME[1], TIME[2], TIME[3], TIME[4])
+    filetime_name = str(TIME.strftime("%Y%m%d_%H%M%p"))
     YEAR_MON_DAY = TIME.strftime("%Y-%m-%d")
     HOUR_MIN = TIME.strftime("%H:%M %p")
 
-    c_range = ratio_df['ratio'].values # The range of Link Qualities.
+    c_range = time_dataset['ratio'].values # The range of Link Qualities.
 
     # Truncate Check
     if truncate == True:
@@ -101,11 +104,11 @@ def SpatialRatioDist(loc_df:pd.DataFrame, ratio_df:pd.DataFrame, c_map=plt.cm.je
     norm = mpl.colors.Normalize(vmin=np.min(c_range), vmax=np.max(c_range))
 
     fig = plt.figure(facecolor='w', figsize=(18,15))
-    for i, sid in enumerate(ratio_df['LINK_ID'].values):
-        target_row = ratio_df[ratio_df['LINK_ID']==sid]
+    for i, sid in enumerate(time_dataset['LINK_ID'].values):
+        target_row = time_dataset[time_dataset['LINK_ID']==sid]
         
-        x = loc_df[loc_df['link_id']==sid]['lon']
-        y = loc_df[loc_df['link_id']==sid]['lat']
+        x = LinkLocationDF[LinkLocationDF['link_id']==sid]['lon']
+        y = LinkLocationDF[LinkLocationDF['link_id']==sid]['lat']
         plt.plot(x, y, linewidth=3.2, color=colors[i])
 
     c_bar = fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=c_map), aspect=50)
@@ -117,4 +120,9 @@ def SpatialRatioDist(loc_df:pd.DataFrame, ratio_df:pd.DataFrame, c_map=plt.cm.je
 
     plt.xlabel('Longitude', fontsize=20)
     plt.ylabel('Latitude', fontsize=20)
+    if savefig is not False:
+        filename = savefig + "_SpatialRatioDist_" + filetime_name + ".png"
+        print(filename, " saved on ", os.getcwd())
+        plt.savefig(filename)
+        
     plt.show()
