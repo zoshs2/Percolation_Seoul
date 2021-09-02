@@ -5,6 +5,7 @@ import matplotlib as mpl
 import os
 from statsmodels.nonparametric.kernel_regression import KernelReg
 from datetime import datetime
+import networkx as nx
 
 def RandLinkVelDist(date_dataset, sample=20, reg=False, time_step=5, savefig:'file_name'=False):
     VEL_RESOLUTION = 5
